@@ -1,27 +1,29 @@
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import Link from "next/link";
+import AuthStatus from "@/components/AuthStatus";
 
 export default function HomePage() {
   return (
-    <main className="container py-10">
-      <div className="max-w-3xl mx-auto space-y-6">
-        <h1 className="text-3xl font-bold">SaaS Clínicas — Base Lista ✅</h1>
-        <p className="text-muted-foreground">
-          Monorepo con Next.js 14, Tailwind y shadcn/ui. Esta es la FASE 0 (estructura y deploy).
-        </p>
-        <Card className="p-6 space-y-4">
-          <p>Estado de salud del API:</p>
-          <div className="flex gap-3">
-            <Link href="/api/health">
-              <Button variant="default">Probar /api/health</Button>
-            </Link>
-            <a href="https://vercel.com" target="_blank" rel="noreferrer">
-              <Button variant="outline">Abrir Vercel</Button>
-            </a>
-          </div>
-        </Card>
+    <main className="container py-10 space-y-6">
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-3xl font-bold">SaaS Clínicas — FASE 2</h1>
+          <p className="text-muted-foreground">Auth + Tenant por ruta /t/&lt;slug&gt; + Backoffice protegido</p>
+        </div>
+        <AuthStatus />
       </div>
+
+      <Card className="p-6 space-y-4">
+        <p>Rutas útiles:</p>
+        <div className="flex flex-wrap gap-3">
+          <Link href="/api/health"><Button variant="outline">/api/health</Button></Link>
+          <Link href="/signin"><Button variant="outline">/signin</Button></Link>
+          <Link href="/t/demo-clinica"><Button>/t/demo-clinica</Button></Link>
+          <Link href="/backoffice"><Button variant="outline">/backoffice</Button></Link>
+          <Link href="/api/tools/diag?t=demo-clinica"><Button variant="outline">/api/tools/diag</Button></Link>
+        </div>
+      </Card>
     </main>
   );
 }
