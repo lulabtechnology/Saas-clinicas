@@ -1,0 +1,13 @@
+{
+  "name": "saas-clinicas",
+  "private": true,
+  "workspaces": ["apps/web"],
+  "scripts": {
+    "dev": "npm --workspace apps/web run dev",
+    "build": "npm --workspace apps/web run build",
+    "start": "npm --workspace apps/web run start",
+    "lint": "npm --workspace apps/web run lint",
+    "db:migrate": "echo \"Aplica migraciones en Supabase SQL Editor (ver FASE 1).\"",
+    "db:seed": "echo \"Ejecuta seeds en Supabase (ver FASE 1).\""
+  }
+}
