@@ -22,10 +22,12 @@ export async function middleware(req: NextRequest) {
     }
   );
 
-  await supabase.auth.getUser().catch(() => null);
+  // Forzar refresh silencioso de sesión para mantener cookies al día
+  await supabase.auth.getSession().catch(() => null);
   return res;
 }
 
+// Aplica a todas las rutas dinámicas (evita assets estáticos)
 export const config = {
-  matcher: ["/", "/signin", "/backoffice", "/t/:path*"]
+  matcher: ["/((?!_next/static|_next/image|favicon.ico).*)"]
 };
