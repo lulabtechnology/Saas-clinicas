@@ -1,6 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
+import type { Route } from "next";
 import { useState } from "react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -26,7 +27,10 @@ export default function FiltersClient({
     const q = new URLSearchParams({ tab, from: vFrom, to: vTo });
     if (vPro) q.set("proId", vPro);
     if (vStatus) q.set("status", vStatus);
-    router.push(`${basePath}?${q.toString()}`);
+
+    // typedRoutes: castear a Route
+    const href = `${basePath}?${q.toString()}` as Route;
+    router.push(href);
   };
 
   return (
