@@ -129,7 +129,10 @@ export default async function TenantDashboard({
           </p>
           <a
             className="underline text-blue-600"
-            href={`/api/public/export/bookings?slug=${encodeURIComponent(params.slug)}&from=${from}&to=${to}${proId ? `&proId=${proId}` : ""}${status ? `&status=${status}` : ""}`}
+            href={{
+              pathname: `/t/${params.slug}`,
+              query: { tab: "export", from, to, ...(proId ? { proId } : {}), ...(status ? { status } : {}) }
+            } as any}
           >
             Descargar bookings.csv
           </a>
@@ -141,8 +144,21 @@ export default async function TenantDashboard({
 
 function TabLink({
   slug, tab, current, children, from, to, proId, status
-}: any) {
-  const href = `/t/${slug}?tab=${tab}&from=${from}&to=${to}${proId ? `&proId=${proId}` : ""}${status ? `&status=${status}` : ""}`;
+}: {
+  slug: string;
+  tab: "cal" | "kpis" | "export";
+  current: string;
+  children: React.ReactNode;
+  from: string;
+  to: string;
+  proId?: string;
+  status?: string;
+}) {
+  const href = {
+    pathname: `/t/${slug}`,
+    query: { tab, from, to, ...(proId ? { proId } : {}), ...(status ? { status } : {}) }
+  } as const;
+
   const active = current === tab;
   return (
     <Link href={href}>
