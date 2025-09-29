@@ -2,12 +2,12 @@ import { createSupabaseAdmin } from "@/lib/supabase/admin";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import Link from "next/link";
-import dynamic from "next/dynamic";
+import NextDynamic from "next/dynamic";
 
 export const dynamic = "force-dynamic";
 
-const KpiChartsClient = dynamic(() => import("./ui/KpiChartsClient"), { ssr: false });
-const FiltersClient = dynamic(() => import("./ui/FiltersClient"), { ssr: false });
+const KpiChartsClient = NextDynamic(() => import("./ui/KpiChartsClient"), { ssr: false });
+const FiltersClient = NextDynamic(() => import("./ui/FiltersClient"), { ssr: false });
 
 // Util mini
 function fmtDate(d: Date) { return d.toISOString().slice(0, 10); }
