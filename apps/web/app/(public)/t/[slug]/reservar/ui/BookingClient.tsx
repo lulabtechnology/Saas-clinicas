@@ -30,12 +30,9 @@ export default function BookingClient({
   const service = useMemo(()=> services.find((s:any)=>s.id===serviceId), [services, serviceId]);
   const pro = useMemo(()=> pros.find((p:any)=>p.id===proId), [pros, proId]);
 
-  // Cargar horarios disponibles al cambiar filtros
   useEffect(()=>{
     (async ()=>{
-      setMsg("");
-      setTimes([]);
-      setTime("");
+      setMsg(""); setTimes([]); setTime("");
       if (!slug || !serviceId || !proId || !date) return;
       try {
         const url = `/api/public/availability?slug=${encodeURIComponent(slug)}&serviceId=${serviceId}&professionalId=${proId}&date=${date}`;
@@ -43,9 +40,7 @@ export default function BookingClient({
         const j = await r.json();
         if (j.ok && Array.isArray(j.times)) {
           setTimes(j.times);
-          if (j.times.length === 0) {
-            setMsg("No hay horarios disponibles para esa fecha. Puedes escribir una hora manual abajo.");
-          }
+          if (j.times.length === 0) setMsg("No hay horarios disponibles para esa fecha. Puedes escribir una hora manual abajo.");
         } else {
           setMsg("No fue posible obtener horarios. Intenta de nuevo o escribe una hora manual.");
         }
@@ -56,8 +51,7 @@ export default function BookingClient({
   }, [slug, serviceId, proId, date]);
 
   const submit = async () => {
-    setLoading(true);
-    setMsg("");
+    setLoading(true); setMsg("");
     try {
       let pickTime = time;
       if (!pickTime) {
@@ -65,35 +59,21 @@ export default function BookingClient({
         if (manual) pickTime = manual;
       }
       if (!slug || !serviceId || !proId || !date || !pickTime || !patientName || !patientPhone) {
-        setMsg("Completa todos los campos (incluye hora).");
-        setLoading(false);
-        return;
+        setMsg("Completa todos los campos (incluye hora)."); setLoading(false); return;
       }
 
       const r = await fetch("/api/public/bookings", {
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({
-          slug,
-          serviceId,
-          professionalId: proId,
-          date,
-          time: pickTime,
-          patientName,
-          patientPhone,
-          prepay
+          slug, serviceId, professionalId: proId, date, time: pickTime, patientName, patientPhone, prepay
         })
       });
       const j = await r.json();
-      if (!j.ok) {
-        setMsg(j.error || "No se pudo crear la reserva.");
-        setLoading(false);
-        return;
-      }
+      if (!j.ok) { setMsg(j.error || "No se pudo crear la reserva."); setLoading(false); return; }
       window.location.href = `/t/${slug}/confirmacion/${j.bookingId}`;
     } catch (e:any) {
-      setMsg(e.message || "Error al reservar.");
-      setLoading(false);
+      setMsg(e.message || "Error al reservar."); setLoading(false);
     }
   };
 
