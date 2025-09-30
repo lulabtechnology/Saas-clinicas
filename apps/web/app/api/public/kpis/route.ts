@@ -22,7 +22,9 @@ export async function GET(req: Request) {
       .eq("slug", slug)
       .maybeSingle();
 
-    if (!tenant) return NextResponse.json({ ok: false, error: "Tenant no encontrado" }, { status: 404 });
+    if (!tenant) {
+      return NextResponse.json({ ok: false, error: "Tenant no encontrado" }, { status: 404 });
+    }
 
     // Fechas (to exclusivo)
     const start = new Date(from);
@@ -32,7 +34,7 @@ export async function GET(req: Request) {
     const startISO = start.toISOString();
     const endISO = end.toISOString();
 
-    // 2) Bookings en rango (opcionalmente por profesional)
+    // 2) Bookings en rango
     let qB = admin
       .from("bookings")
       .select("id, scheduled_at, professional_id, status")
@@ -42,10 +44,11 @@ export async function GET(req: Request) {
 
     if (proId) qB = qB.eq("professional_id", proId);
 
-    const { data: bookings = [] } = await qB;
+    const bookingsRes = await qB;
+    const bookings: any[] = bookingsRes.data ?? [];
 
     // 3) Payments en rango (pagos exitosos)
-    const { data: pays = [] } = await admin
+    const paysRes = await admin
       .from("payments")
       .select("id, booking_id, amount_cents, status, created_at")
       .eq("tenant_id", tenant.id)
@@ -53,15 +56,18 @@ export async function GET(req: Request) {
       .gte("created_at", startISO)
       .lt("created_at", endISO);
 
+    const pays: any[] = paysRes.data ?? [];
+
     // Map de pagos por booking
     const paidByBooking = new Map<string, number>();
     let revenue_cents = 0;
     for (const p of pays) {
-      if (p.status === "succeeded") {
-        revenue_cents += p.amount_cents || 0;
-        if (p.booking_id) {
+      if (p?.status === "succeeded") {
+        const amt = Number(p?.amount_cents ?? 0);
+        revenue_cents += amt;
+        if (p?.booking_id) {
           const prev = paidByBooking.get(p.booking_id) || 0;
-          paidByBooking.set(p.booking_id, prev + (p.amount_cents || 0));
+          paidByBooking.set(p.booking_id, prev + amt);
         }
       }
     }
@@ -74,18 +80,19 @@ export async function GET(req: Request) {
 
     // Series por día
     const dayKey = (d: Date) => d.toISOString().slice(0, 10);
+
     const bookingsDaily: Record<string, number> = {};
     for (const b of bookings) {
       const k = dayKey(new Date(b.scheduled_at));
       bookingsDaily[k] = (bookingsDaily[k] || 0) + 1;
     }
+
     const revenueDaily: Record<string, number> = {};
     for (const p of pays) {
       const k = dayKey(new Date(p.created_at));
-      revenueDaily[k] = (revenueDaily[k] || 0) + (p.amount_cents || 0);
+      revenueDaily[k] = (revenueDaily[k] || 0) + Number(p?.amount_cents ?? 0);
     }
 
-    // Normalizar a arrays ordenados
     const sortKeys = (obj: Record<string, number>) =>
       Object.keys(obj).sort().map(k => ({ date: k, value: obj[k] }));
 
