@@ -3,6 +3,8 @@ import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import Link from "next/link";
 import NextDynamic from "next/dynamic";
+import { cookies } from "next/headers";
+import { createServerClient } from "@supabase/ssr";
 
 export const dynamic = "force-dynamic";
 
@@ -11,6 +13,23 @@ const FiltersClient = NextDynamic(() => import("./ui/FiltersClient"), { ssr: fal
 
 // Util mini
 function fmtDate(d: Date) { return d.toISOString().slice(0, 10); }
+
+async function getSSRUser() {
+  const store = cookies();
+  const supa = createServerClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    {
+      cookies: {
+        get: (name: string) => store.get(name)?.value,
+        set: () => {},
+        remove: () => {},
+      },
+    }
+  );
+  const { data } = await supa.auth.getUser();
+  return data.user ?? null;
+}
 
 export default async function TenantDashboard({
   params,
@@ -25,13 +44,32 @@ export default async function TenantDashboard({
 
   const { data: tenant } = await admin
     .from("tenants")
-    .select("id, name, timezone")
+    .select("id, name, timezone, slug")
     .eq("slug", params.slug)
     .maybeSingle();
 
   if (!tenant) {
     return <main className="container py-10">Clínica no encontrada.</main>;
   }
+
+  // === Roles y membresía ===
+  const ssrUser = await getSSRUser();
+  if (!ssrUser) return <main className="container py-10">Acceso restringido. Inicia sesión.</main>;
+
+  const [{ data: uRow }, { data: member }] = await Promise.all([
+    admin.from("users").select("is_platform_admin").eq("id", ssrUser.id).maybeSingle(),
+    admin.from("staff").select("role,is_active").eq("tenant_id", tenant.id).eq("user_id", ssrUser.id).maybeSingle(),
+  ]);
+
+  const isPlatformAdmin = !!uRow?.is_platform_admin;
+  const memberRole = member?.is_active ? (member?.role as "admin" | "staff" | "pro") : null;
+  const canSeeTenant = isPlatformAdmin || !!memberRole;
+
+  if (!canSeeTenant) {
+    return <main className="container py-10">Acceso denegado a este tenant.</main>;
+  }
+
+  const canSeeKpisExport = isPlatformAdmin || memberRole === "admin";
 
   // Rango por defecto: semana actual [hoy, hoy+6]
   const today = new Date();
@@ -53,7 +91,7 @@ export default async function TenantDashboard({
 
   // Datos del calendario (server render)
   let bookings: any[] = [];
-  if (tab === "cal") {
+  {
     const q = admin
       .from("bookings")
       .select(
@@ -78,10 +116,24 @@ export default async function TenantDashboard({
   };
   const bookingsNorm = bookings.map(norm);
 
+  // Tabs según rol
+  const tabs: Array<{ key: "cal" | "kpis" | "export"; label: string; show: boolean }> = [
+    { key: "cal", label: "Calendario", show: true },
+    { key: "kpis", label: "KPIs", show: canSeeKpisExport },
+    { key: "export", label: "Export CSV", show: canSeeKpisExport },
+  ];
+
+  // Ajustar tab si no tiene permiso
+  const firstAllowed = (tabs.find(t => t.show)?.key) || "cal";
+  const activeTab = tabs.find(t => t.key === tab && t.show) ? tab : firstAllowed;
+
   return (
     <main className="container py-8 space-y-6">
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-semibold">{tenant.name}</h1>
+        <div className="text-xs text-slate-500">
+          {isPlatformAdmin ? "Plataforma (admin)" : `Rol clínica: ${memberRole}`}
+        </div>
         <div className="flex gap-2">
           <Link href={`/t/${params.slug}/reservar`}>
             <Button>+ Nueva reserva</Button>
@@ -91,9 +143,20 @@ export default async function TenantDashboard({
 
       {/* Tabs */}
       <div className="flex gap-2">
-        <TabLink slug={params.slug} tab="cal" current={tab} from={from} to={to} proId={proId} status={status}>Calendario</TabLink>
-        <TabLink slug={params.slug} tab="kpis" current={tab} from={from} to={to} proId={proId} status={status}>KPIs</TabLink>
-        <TabLink slug={params.slug} tab="export" current={tab} from={from} to={to} proId={proId} status={status}>Export CSV</TabLink>
+        {tabs.filter(t => t.show).map(t => (
+          <TabLink
+            key={t.key}
+            slug={params.slug}
+            tab={t.key}
+            current={activeTab}
+            from={from}
+            to={to}
+            proId={proId}
+            status={status}
+          >
+            {t.label}
+          </TabLink>
+        ))}
       </div>
 
       {/* Filtros (client) */}
@@ -105,34 +168,31 @@ export default async function TenantDashboard({
           pros={pros ?? []}
           proId={proId}
           status={status}
-          tab={tab}
+          tab={activeTab}
         />
       </Card>
 
       {/* Contenido por tab */}
-      {tab === "cal" && (
+      {activeTab === "cal" && (
         <Card className="p-4">
           <CalendarList timezone={tenant.timezone} items={bookingsNorm} />
         </Card>
       )}
 
-      {tab === "kpis" && (
+      {activeTab === "kpis" && (
         <Card className="p-4">
           <KpiChartsClient slug={params.slug} from={from} to={to} proId={proId} />
         </Card>
       )}
 
-      {tab === "export" && (
+      {activeTab === "export" && (
         <Card className="p-4 space-y-3">
           <p className="text-sm text-slate-600">
             Exporta las reservas y pagos entre <b>{from}</b> y <b>{to}</b>.
           </p>
           <a
             className="underline text-blue-600"
-            href={{
-              pathname: `/t/${params.slug}`,
-              query: { tab: "export", from, to, ...(proId ? { proId } : {}), ...(status ? { status } : {}) }
-            } as any}
+            href={`/api/public/export/bookings?slug=${encodeURIComponent(params.slug)}&from=${from}&to=${to}${proId ? `&proId=${proId}` : ""}${status ? `&status=${status}` : ""}`}
           >
             Descargar bookings.csv
           </a>
